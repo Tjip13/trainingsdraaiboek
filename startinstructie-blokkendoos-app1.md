@@ -29,7 +29,5 @@ Klus 4 (de importfunctie) komt uit het contract van project #6 (uit projecten-vo
 
 ## Plek in de totale volgorde
 
-1. Deze instructie: project #1 uit projecten-voor-fable.md, in Claude Code.
-2. Fundament administratiesysteem: stap 1 uit masterplan-administratiesysteem.md, in Cowork. Kan ook eerder of tussendoor, staat los van de blokkendoos.
-3. Daarna project #6 uit projecten-voor-fable.md, te beginnen met de archief-module (startinstructie in sectie 9 van plan-content-koppeling-blokkendoos.md), in Cowork.
-4. De structuurmaakmachine, twee losse voorwaarden: de Ollama-route (stap 2 van plan-content-koppeling-blokkendoos.md sectie 8) pas na stap 6 uit masterplan-administratiesysteem.md, de OCR-route (stap 3) pas na stap 4 (Vision-OCR/bonnetjesmachine) uit masterplan-administratiesysteem.md. Ze hoeven niet allebei klaar te zijn voordat de ander kan starten.
+
+

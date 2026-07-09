@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
 import {
   Users, Snowflake, BookOpen, Shield, MessagesSquare, VenetianMask,
@@ -507,13 +508,15 @@ function TagLijst({ tags, klein }) {
 
 /* ---------- oefening bewerken ---------- */
 
-function ExerciseEditor({ ex, onSave, onClose, onDelete, doelgroepen = [], addDoelgroep, openScenId = null }) {
+function ExerciseEditor({ ex, onSave, onClose, onDelete, doelgroepen = [], addDoelgroep, openScenId = null, trainingNaam = "" }) {
   const [f, setF] = useState({ ...leegExercise(), ...ex });
   const [openScen, setOpenScen] = useState(openScenId);
   const [nieuweDoelgroep, setNieuweDoelgroep] = useState("");
   const [snelOpen, setSnelOpen] = useState(false);
   const [snelTekst, setSnelTekst] = useState("");
   const [sjabloonKopie, setSjabloonKopie] = useState(false);
+  const [scenExport, setScenExport] = useState(null);
+  const [oefExport, setOefExport] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === "number" ? Number(e.target.value) : e.target.value });
   const patchScen = (id, p) => setF({ ...f, scenarios: f.scenarios.map((s) => (s.id === id ? { ...s, ...p } : s)) });
 
@@ -533,6 +536,7 @@ function ExerciseEditor({ ex, onSave, onClose, onDelete, doelgroepen = [], addDo
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modalkop">
           <strong>{ex.id ? "Oefening bewerken" : "Nieuwe oefening"}</strong>
+          {ex.id && <IconBtn subtle title="Exporteer deze oefening" onClick={() => setOefExport(true)}><Printer size={15} /></IconBtn>}
           <IconBtn title="Sluiten" onClick={onClose}><X size={18} /></IconBtn>
         </div>
         <div className="modalbody">
@@ -618,6 +622,7 @@ function ExerciseEditor({ ex, onSave, onClose, onDelete, doelgroepen = [], addDo
                   <PersoonlijkBadge s={s} />
                   {s.uitvoeringen.length > 0 && <span className="uitvoerbadge">{s.uitvoeringen.length}× gedaan</span>}
                   <span style={{ flex: 1 }} />
+                  <IconBtn subtle title="Exporteer dit scenario (voor acteur)" onClick={() => setScenExport(s)}><Printer size={14} /></IconBtn>
                   <IconBtn subtle danger title="Scenario verwijderen" onClick={() => setF({ ...f, scenarios: f.scenarios.filter((x) => x.id !== s.id) })}><Trash2 size={14} /></IconBtn>
                 </div>
                 {openScen === s.id && (
@@ -728,6 +733,8 @@ function ExerciseEditor({ ex, onSave, onClose, onDelete, doelgroepen = [], addDo
           <button className="knop primair" onClick={() => onSave(f)} disabled={!f.naam.trim()}>Opslaan</button>
         </div>
       </div>
+      {scenExport && <ScenarioExportOverlay ex={f} s={scenExport} data={{ trainingNaam }} onClose={() => setScenExport(null)} />}
+      {oefExport && <OefeningExportOverlay ex={f} data={{ trainingNaam }} onClose={() => setOefExport(false)} />}
     </div>
   );
 }
@@ -917,7 +924,7 @@ function BibliotheekTab({ data, up }) {
       )}
       {editing && <ExerciseEditor ex={editing} onSave={save} onClose={() => { setEditing(null); setOpenScenId(null); }} onDelete={editing.id ? del : null}
         doelgroepen={data.doelgroepen} addDoelgroep={(n) => up((d) => (d.doelgroepen.includes(n) ? {} : { doelgroepen: [...d.doelgroepen, n] }))}
-        openScenId={openScenId} />}
+        openScenId={openScenId} trainingNaam={data.trainingNaam} />}
     </div>
   );
 }
@@ -1561,10 +1568,11 @@ function InfoTab({ data, up, exMap, onRestore }) {
 function pushScenarioTekst(r, s, pad = "     ") {
   SCENARIO_VELDEN.forEach(([k, l]) => {
     if (k === "persoon" || !s[k]) return;
+    r.push("\v");
     if (k === "zinnen") { r.push(`${pad}${l}:`); s[k].split("\n").filter(Boolean).forEach((z) => r.push(`${pad}  „${z.trim()}”`)); return; }
     r.push(`${pad}${l}: ${s[k]}`);
   });
-  (s.eigen || []).forEach((eg) => { if (eg.kop || eg.tekst) r.push(`${pad}${eg.kop || "Kopje"}: ${eg.tekst}`); });
+  (s.eigen || []).forEach((eg) => { if (eg.kop || eg.tekst) { r.push("\v", `${pad}${eg.kop || "Kopje"}: ${eg.tekst}`); } });
 }
 
 function buildExportText(data, exMap, mode) {
@@ -1577,22 +1585,35 @@ function buildExportText(data, exMap, mode) {
     if (data.org.acteur?.aanwezig && (data.org.acteur.van || data.org.acteur.tot)) r.push(`Aanwezig: ${data.org.acteur.van || "?"}–${data.org.acteur.tot || "?"}`, "");
     const match = (s) => !sel.length || !(s.doelgroepen || []).length || (s.doelgroepen || []).some((x) => sel.includes(x));
     const gezien = new Set();
+    const oefeningen = [];
     data.dagen.forEach((d) => d.blokken.forEach((b) => {
       if (b.type !== "oef" || gezien.has(b.exId)) return;
       gezien.add(b.exId);
       const ex = exMap[b.exId];
-      if (!ex || !(ex.scenarios || []).length) return;
-      r.push(`■ ${ex.naam}`);
+      if (ex) oefeningen.push(ex);
+    }));
+    const acteurOef = oefeningen.filter((ex) => ex.cat === "acteur" || ex.cat === "simulatie");
+    if (acteurOef.length) r.push("OEFENINGEN MET ACTEUR", "=====================", "");
+    const voorOefeningen = r.length;
+    acteurOef.forEach((ex) => {
+      r.push(`▪ ${ex.naam}`, `  ${CATS[ex.cat]?.label || ""} · ${ex.duurKort}–${ex.duurLang} min · ${ex.minDeel}–${ex.maxDeel} deelnemers${ex.sheets ? " · sheet " + ex.sheets : ""}`);
       if (ex.doel) r.push(`  Doel: ${ex.doel}`);
+      if (ex.benodigd) r.push(`  Benodigd: ${ex.benodigd}`);
+      if (ex.ruimte) r.push(`  Ruimte: ${ex.ruimte}`);
+      if (ex.volgorde) r.push(`  Volgorde: ${ex.volgorde}`);
+      if (ex.instructie) r.push(`  ${ex.instructie}`);
+      if (ex.varianten) r.push(`  Varianten: ${ex.varianten.split("\n").filter(Boolean).join(" / ")}`);
       r.push("");
-      ex.scenarios.filter(match).forEach((s) => {
+      (ex.scenarios || []).filter(match).forEach((s) => {
         const h = ["", "licht", "middel", "heftig"][s.heftigheid || 0];
-        r.push(`  ── ${s.titel || "Scenario"}${s.persoon ? " · " + s.persoon : ""}${h ? " · heftigheid: " + h : ""}${s.fysiekeDreiging ? " · fysieke dreiging" : ""}${s.persoonlijk ? " · PERSOONLIJK" + (s.vanDeelnemer ? " (" + s.vanDeelnemer + ")" : "") : ""}${(s.doelgroepen || []).length ? " · " + s.doelgroepen.join(" / ") : ""}`);
+        r.push("\f", `■ ${ex.naam}`);
+        if (ex.doel) r.push(`  Doel: ${ex.doel}`);
+        r.push("", `  ── ${s.titel || "Scenario"}${s.persoon ? " · " + s.persoon : ""}${h ? " · heftigheid: " + h : ""}${s.fysiekeDreiging ? " · fysieke dreiging" : ""}${s.persoonlijk ? " · PERSOONLIJK" + (s.vanDeelnemer ? " (" + s.vanDeelnemer + ")" : "") : ""}${(s.doelgroepen || []).length ? " · " + s.doelgroepen.join(" / ") : ""}`);
         pushScenarioTekst(r, s);
         r.push("");
       });
-    }));
-    if (r.length <= 4) r.push("Geen praktijksimulaties met scenario's gevonden in dit draaiboek.");
+    });
+    if (!acteurOef.length) r.push("Geen praktijksimulaties met scenario's gevonden in dit draaiboek.");
     return r.join("\n");
   }
   if (mode !== "kaartjes") {
@@ -1649,21 +1670,141 @@ function buildExportText(data, exMap, mode) {
   return r.join("\n");
 }
 
-function ExportOverlay({ data, exMap, onClose }) {
-  const [mode, setMode] = useState("alles");
+function buildScenarioExportText(ex, s, data) {
+  const r = [];
+  const kop = `Acteursbriefing · ${ex.naam}`;
+  r.push(kop, "=".repeat(kop.length), "");
+  r.push(`Training: ${data.trainingNaam}`);
+  if (ex.doel) r.push(`Doel: ${ex.doel}`);
+  r.push("");
+  const h = ["", "licht", "middel", "heftig"][s.heftigheid || 0];
+  r.push(`── ${s.titel || "Scenario"}${s.persoon ? " · " + s.persoon : ""}${h ? " · heftigheid: " + h : ""}${s.fysiekeDreiging ? " · fysieke dreiging" : ""}${s.persoonlijk ? " · PERSOONLIJK" + (s.vanDeelnemer ? " (" + s.vanDeelnemer + ")" : "") : ""}${(s.doelgroepen || []).length ? " · " + s.doelgroepen.join(" / ") : ""}`);
+  pushScenarioTekst(r, s, "  ");
+  return r.join("\n");
+}
+
+function buildOefeningExportText(ex, data) {
+  const r = [];
+  const kop = `Instructiekaart · ${ex.naam}`;
+  r.push(kop, "=".repeat(kop.length), "");
+  r.push(`Training: ${data.trainingNaam}`);
+  r.push(`${CATS[ex.cat]?.label || ""} · ${ex.duurKort}–${ex.duurLang} min · ${ex.minDeel}–${ex.maxDeel} deelnemers${ex.sheets ? " · sheet " + ex.sheets : ""}`);
+  if (ex.doel) r.push(`Doel: ${ex.doel}`);
+  if (ex.benodigd) r.push(`Benodigd: ${ex.benodigd}`);
+  if (ex.ruimte) r.push(`Ruimte: ${ex.ruimte}`);
+  if (ex.volgorde) r.push(`Volgorde: ${ex.volgorde}`);
+  if (ex.instructie) r.push(ex.instructie);
+  if (ex.varianten) r.push(`Varianten: ${ex.varianten.split("\n").filter(Boolean).join(" / ")}`);
+  (ex.scenarios || []).forEach((s) => {
+    const h = ["", "licht", "middel", "heftig"][s.heftigheid || 0];
+    r.push("\f", `── ${s.titel || "Scenario"}${s.persoon ? " · " + s.persoon : ""}${h ? " · heftigheid: " + h : ""}${s.fysiekeDreiging ? " · fysieke dreiging" : ""}${s.persoonlijk ? " · PERSOONLIJK" + (s.vanDeelnemer ? " (" + s.vanDeelnemer + ")" : "") : ""}${(s.doelgroepen || []).length ? " · " + s.doelgroepen.join(" / ") : ""}`);
+    pushScenarioTekst(r, s, "  ");
+  });
+  return r.join("\n");
+}
+
+function ScenarioExportOverlay({ ex, s, data, onClose }) {
   const [gekopieerd, setGekopieerd] = useState(false);
-  const tekst = buildExportText(data, exMap, mode);
+  const tekst = buildScenarioExportText(ex, s, data);
   const kopieer = async () => {
-    try { await navigator.clipboard.writeText(tekst); setGekopieerd(true); }
+    const platteTekst = tekst.replace(/\v/g, "");
+    try { await navigator.clipboard.writeText(platteTekst); setGekopieerd(true); }
     catch {
       const ta = document.createElement("textarea");
-      ta.value = tekst; document.body.appendChild(ta); ta.select();
+      ta.value = platteTekst; document.body.appendChild(ta); ta.select();
       try { document.execCommand("copy"); setGekopieerd(true); } catch {}
       document.body.removeChild(ta);
     }
     setTimeout(() => setGekopieerd(false), 2000);
   };
+  return createPortal(
+    <div className="overlay" onClick={onClose}>
+      <div className="modal groot" onClick={(e) => e.stopPropagation()}>
+        <div className="modalkop no-print">
+          <strong>Scenario exporteren: {s.titel || "Scenario"}</strong>
+          <IconBtn title="Sluiten" onClick={onClose}><X size={18} /></IconBtn>
+        </div>
+        <ExportPagina pag={tekst} klasse="exporttekst print-area" />
+        <div className="modalvoet no-print">
+          <button className="knop" onClick={() => window.print()}><Printer size={15} /> Afdrukken / PDF</button>
+          <span style={{ flex: 1 }} />
+          <button className="knop primair" onClick={kopieer}>{gekopieerd ? <><Check size={15} /> Gekopieerd</> : <><Copy size={15} /> Kopieer tekst</>}</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function OefeningExportOverlay({ ex, data, onClose }) {
+  const [gekopieerd, setGekopieerd] = useState(false);
+  const tekst = buildOefeningExportText(ex, data);
+  const kopieer = async () => {
+    const platteTekst = tekst.replace(/\f/g, "").replace(/\v/g, "");
+    try { await navigator.clipboard.writeText(platteTekst); setGekopieerd(true); }
+    catch {
+      const ta = document.createElement("textarea");
+      ta.value = platteTekst; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); setGekopieerd(true); } catch {}
+      document.body.removeChild(ta);
+    }
+    setTimeout(() => setGekopieerd(false), 2000);
+  };
+  return createPortal(
+    <div className="overlay" onClick={onClose}>
+      <div className="modal groot" onClick={(e) => e.stopPropagation()}>
+        <div className="modalkop no-print">
+          <strong>Oefening exporteren: {ex.naam}</strong>
+          <IconBtn title="Sluiten" onClick={onClose}><X size={18} /></IconBtn>
+        </div>
+        <ExportTekst tekst={tekst} />
+        <div className="modalvoet no-print">
+          <button className="knop" onClick={() => window.print()}><Printer size={15} /> Afdrukken / PDF</button>
+          <span style={{ flex: 1 }} />
+          <button className="knop primair" onClick={kopieer}>{gekopieerd ? <><Check size={15} /> Gekopieerd</> : <><Copy size={15} /> Kopieer tekst</>}</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function ExportPagina({ pag, klasse }) {
+  const delen = pag.split("\v").map((d) => d.replace(/^\n/, "")).filter(Boolean);
+  if (delen.length < 2) return <pre className={klasse + " scenariogroep"}>{pag}</pre>;
   return (
+    <div className={klasse + " scenariogroep"}>
+      {delen.map((d, i) => <div key={i} className="exportveld">{d}</div>)}
+    </div>
+  );
+}
+
+function ExportTekst({ tekst }) {
+  const groepen = tekst.split("\f");
+  if (groepen.length < 2) return <ExportPagina pag={tekst} klasse="exporttekst print-area" />;
+  return (
+    <div className="exporttekst print-area">
+      {groepen.map((groep, i) => <ExportPagina key={i} pag={groep} klasse="scenarioblok" />)}
+    </div>
+  );
+}
+
+function ExportOverlay({ data, exMap, onClose }) {
+  const [mode, setMode] = useState("alles");
+  const [gekopieerd, setGekopieerd] = useState(false);
+  const tekst = buildExportText(data, exMap, mode);
+  const kopieer = async () => {
+    const platteTekst = tekst.replace(/\f/g, "").replace(/\v/g, "");
+    try { await navigator.clipboard.writeText(platteTekst); setGekopieerd(true); }
+    catch {
+      const ta = document.createElement("textarea");
+      ta.value = platteTekst; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); setGekopieerd(true); } catch {}
+      document.body.removeChild(ta);
+    }
+    setTimeout(() => setGekopieerd(false), 2000);
+  };
+  return createPortal(
     <div className="overlay" onClick={onClose}>
       <div className="modal groot" onClick={(e) => e.stopPropagation()}>
         <div className="modalkop no-print">
@@ -1675,14 +1816,15 @@ function ExportOverlay({ data, exMap, onClose }) {
           </div>
           <IconBtn title="Sluiten" onClick={onClose}><X size={18} /></IconBtn>
         </div>
-        <pre className="exporttekst print-area">{tekst}</pre>
+        <ExportTekst tekst={tekst} />
         <div className="modalvoet no-print">
           <button className="knop" onClick={() => window.print()}><Printer size={15} /> Afdrukken / PDF</button>
           <span style={{ flex: 1 }} />
           <button className="knop primair" onClick={kopieer}>{gekopieerd ? <><Check size={15} /> Gekopieerd</> : <><Copy size={15} /> Kopieer tekst</>}</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1760,6 +1902,8 @@ function DraaiboekTab({ data, up, exMap, nu }) {
   const [regWie, setRegWie] = useState([]);
   const [regNotitie, setRegNotitie] = useState("");
   const [qrOpen, setQrOpen] = useState(false);
+  const [scenExport, setScenExport] = useState(null);
+  const [oefExport, setOefExport] = useState(null);
 
   const di = Math.min(dagIdx, data.dagen.length - 1);
   const dag = data.dagen[di];
@@ -2041,7 +2185,7 @@ function DraaiboekTab({ data, up, exMap, nu }) {
                     {ex.sheets && <span className="sheetbadge">{ex.sheets}</span>}
                     <span className="blokduur">{b.reserve ? "(" + fmtDur(b.versie === "lang" ? ex.duurLang : ex.duurKort) + ")" : fmtDur(dur)}{!b.reserve && b.extra ? <em className="extra"> ({b.extra > 0 ? "+" : ""}{b.extra})</em> : null}</span>
                   </span>
-                  {knoppen(null)}
+                  {knoppen(<IconBtn subtle title="Exporteer deze oefening" onClick={() => setOefExport(ex)}><Printer size={15} /></IconBtn>)}
                 </div>
                 {open && (
                   <div className="blokdetail">
@@ -2076,6 +2220,7 @@ function DraaiboekTab({ data, up, exMap, nu }) {
                               <DoelgroepChips lijst={s.doelgroepen} />
                               <PersoonlijkBadge s={s} />
                               {s.uitvoeringen?.length > 0 && <span className="uitvoerbadge">{s.uitvoeringen.length}× gedaan</span>}
+                              <span className="no-print"><IconBtn title="Exporteer dit scenario (voor acteur)" onClick={() => setScenExport({ ex, s })}><Printer size={13} /></IconBtn></span>
                             </div>
                             {openScen === s.id && (
                               <div className="scenariovelden">
@@ -2197,6 +2342,8 @@ function DraaiboekTab({ data, up, exMap, nu }) {
         </div>
       </div>
       {qrOpen && qrLinks.length > 0 && <QrOverlay links={qrLinks} onClose={() => setQrOpen(false)} />}
+      {scenExport && <ScenarioExportOverlay ex={scenExport.ex} s={scenExport.s} data={data} onClose={() => setScenExport(null)} />}
+      {oefExport && <OefeningExportOverlay ex={oefExport} data={data} onClose={() => setOefExport(null)} />}
     </div>
   );
 }
@@ -2400,7 +2547,7 @@ export default function App() {
           <button key={k} className={tab === k ? "actief" : ""} onClick={() => setTab(k)}>{l}</button>
         ))}
       </nav>
-      <main>
+      <main className="no-print">
         {tab === "draaiboek" && <DraaiboekTab data={data} up={up} exMap={exMap} nu={nu} />}
         {tab === "bibliotheek" && <BibliotheekTab data={data} up={up} />}
         {tab === "deelnemers" && <DeelnemersTab data={data} up={up} />}
@@ -2664,6 +2811,9 @@ function StijlBlad() {
   .modalvoet { display: flex; gap: 8px; padding: 14px 18px; border-top: 1px solid #EBEBEE; align-items: center; flex-wrap: wrap; }
   .exporttekst { margin: 0; padding: 18px; overflow: auto; font-family: ui-monospace, "SF Mono", Menlo, monospace;
     font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; }
+  .exportveld { margin: 0; padding: 0; font: inherit; white-space: pre-wrap; }
+  .scenariogroep { display: block; }
+  .scenarioblok.scenariogroep { margin-bottom: 22px; }
 
   @media (max-width: 860px) {
     .werkgebied { grid-template-columns: 1fr; }
@@ -2680,10 +2830,14 @@ function StijlBlad() {
   }
   @media print {
     .no-print, .app-hoofd, .tabbalk { display: none !important; }
-    .app { background: #fff; }
-    .overlay { position: static; background: #fff; padding: 0; }
-    .modal { box-shadow: none; max-height: none; width: 100%; border-radius: 0; }
-    .exporttekst { font-size: 11px; }
+    .app { background: #fff; min-height: 0; }
+    main { max-width: none; padding: 0; margin: 0; }
+    .overlay { position: static; background: #fff; padding: 0; display: block; }
+    .modal, .modal.groot { box-shadow: none; max-height: none; width: 100%; border-radius: 0; display: block; }
+    .exporttekst { font-size: 11px; overflow: visible; }
+    .exporttekst:not(.scenariogroep) { break-inside: avoid; }
+    .scenariogroep { break-inside: avoid; }
+    .scenariogroep .exportveld { margin: 0; padding: 0; break-inside: avoid; }
   }
   `}</style>;
 }
