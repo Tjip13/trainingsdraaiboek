@@ -13,3 +13,8 @@ klus vallen. Niet in de code verwerken zonder expliciete opdracht.
   contactpersoon, acteur, tijden en paklijst. Gebruiker heeft voorbeelden
   van zijn huidige Excel-trainersdraaiboek. Doel: tijdens de training nooit
   hoeven bladeren tussen tijdschema en instructies.
+
+- Instructiekaartjes-export breekt nog af midden in een oefening bij het
+  printen. Dezelfde veld-splitsing die dit voor scenario's oploste
+  (break-inside: avoid per veld i.p.v. één grote <pre> per oefening) zou dit
+  ook hier moeten oplossen. Lage prioriteit.
