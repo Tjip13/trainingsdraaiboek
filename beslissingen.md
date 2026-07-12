@@ -93,3 +93,34 @@ Log van keuzes bij onduidelijkheden, één regel context per beslissing.
   het bestaande per-scenario-knopje, in zowel `ExerciseEditor` (Bibliotheek)
   als `DraaiboekTab`. Hergebruikt dezelfde overlay/print-CSS-aanpak
   (`OefeningExportOverlay`, portal naar `document.body`).
+
+## Klus 3: Offline/PWA (2026-07-12)
+
+- Handgeschreven service worker, geen `vite-plugin-pwa`: geen nieuwe
+  dependency nodig voor iets dat met een kleine, uit te leggen `sw.js` ook
+  kan. De bestandslijst in de service worker wordt niet met de hand
+  bijgehouden (foutgevoelig bij een gewijzigde build-output), maar
+  automatisch gegenereerd door `scripts/genereer-sw.js`, dat na `vite build`
+  draait (`npm run build` doet dit nu in één stap) en de `dist`-map uitleest.
+  De cachenaam bevat een hash van de build-inhoud, zodat elke nieuwe build
+  automatisch een nieuwe cache krijgt en de oude bij `activate` wordt
+  opgeruimd.
+- Geen wijziging aan `.github/workflows/deploy.yml` nodig: die roept al
+  `npm run build` aan, en dat commando genereert nu vanzelf ook `sw.js` mee.
+- Alle app-data zat al in `localStorage` (zie `src/main.jsx`), dus daarvoor
+  was niets te doen voor "werkt offline"; de service worker hoeft alleen de
+  app-bestanden zelf (HTML/JS/manifest/iconen) te cachen.
+- Twee placeholder-iconen (`public/icons/icon-192.png` en `icon-512.png`)
+  gegenereerd als effen kleurvlak in de huisstijlkleur, zonder externe
+  library (met een klein Node-scriptje dat rechtstreeks een PNG schrijft).
+  Vervangbaar door een eigen logo later, geen functionele wijziging nodig
+  in `manifest.webmanifest` of `index.html` om dat te doen (zelfde
+  bestandsnamen/afmetingen aanhouden).
+- **Belangrijk voor iOS**: als de app als "Zet op beginscherm"-icoon wordt
+  geopend, gebruikt Safari daarvoor een aparte, van gewone Safari-tabbladen
+  gescheiden `localStorage`. Bestaande data die in de Safari-browser stond
+  (bijv. via eerdere `npm run dev`-tests of het bezoeken van de live-URL in
+  een gewone tab) is dus niet automatisch zichtbaar in de beginscherm-app,
+  en andersom. Voor de iPad-test moet de gebruiker eerst de app op het
+  beginscherm zetten en dáár de backup-JSON terugzetten via
+  "Backup terugzetten", niet in Safari zelf.
