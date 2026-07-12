@@ -2575,7 +2575,7 @@ function StijlBlad() {
   h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; margin: 0; }
   h3 { font-size: 15px; font-weight: 700; margin: 0 0 10px; }
   p { margin: 0; }
-  input, select, textarea { font: inherit; font-size: 14px; color: #1D1D1F; background: #fff;
+  input, select, textarea { font: inherit; font-size: 16px; color: #1D1D1F; background: #fff;
     border: 1px solid #D2D2D7; border-radius: 9px; padding: 8px 10px; width: 100%; }
   input:focus, select:focus, textarea:focus { outline: 2px solid #0071E3; outline-offset: 0; border-color: transparent; }
   textarea { resize: vertical; }

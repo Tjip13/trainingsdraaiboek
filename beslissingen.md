@@ -124,3 +124,20 @@ Log van keuzes bij onduidelijkheden, één regel context per beslissing.
   en andersom. Voor de iPad-test moet de gebruiker eerst de app op het
   beginscherm zetten en dáár de backup-JSON terugzetten via
   "Backup terugzetten", niet in Safari zelf.
+
+## Na klus 3: README + kleine bugfix (2026-07-12)
+
+- README.md herschreven voor de situatie na klus 1-3: live GitHub Pages-link
+  bovenaan, Node.js/Terminal-instructies verplaatst naar een kopje "Voor de
+  beheerder" onderaan. Geen inhoudelijke wijziging aan wat er al stond over
+  gescheiden opslag per apparaat en de Backup-workflow, alleen aangevuld met
+  de iOS-beginscherm-vs-Safari-waarschuwing uit klus 3.
+- Bug: op iPad (7e gen, iPadOS 18.7.9) verscheen in landscape geen
+  toetsenbord bij tekstvelden in het deelnemers-tabblad, in portrait wel.
+  Geen overduidelijke oorzaak gevonden in de code (geen overlappende
+  elementen, geen event dat het tikken onderschept). Kleine, veilige gok
+  toegepast: `font-size` van alle `input`/`select`/`textarea` van 14px naar
+  16px, een bekende iOS Safari-eigenaardigheid rond focus-gedrag bij velden
+  onder 16px. Nog niet bevestigd of dit de oorzaak was; als het probleem
+  blijft bestaan na deze wijziging, terug naar de tekentafel met het apparaat
+  erbij.
