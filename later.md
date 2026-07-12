@@ -18,3 +18,7 @@ klus vallen. Niet in de code verwerken zonder expliciete opdracht.
   printen. Dezelfde veld-splitsing die dit voor scenario's oploste
   (break-inside: avoid per veld i.p.v. één grote <pre> per oefening) zou dit
   ook hier moeten oplossen. Lage prioriteit.
+
+- Zichtbare "nieuwe versie beschikbaar, tik om te verversen"-melding zodra
+  de service worker een update detecteert, i.p.v. stil op de achtergrond
+  verversen. Kwam op tijdens klus 3 (offline/PWA), niet gevraagd.
