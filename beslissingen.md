@@ -138,6 +138,5 @@ Log van keuzes bij onduidelijkheden, één regel context per beslissing.
   elementen, geen event dat het tikken onderschept). Kleine, veilige gok
   toegepast: `font-size` van alle `input`/`select`/`textarea` van 14px naar
   16px, een bekende iOS Safari-eigenaardigheid rond focus-gedrag bij velden
-  onder 16px. Nog niet bevestigd of dit de oorzaak was; als het probleem
-  blijft bestaan na deze wijziging, terug naar de tekentafel met het apparaat
-  erbij.
+  onder 16px. **Bevestigd door test op het apparaat (2026-07-12): dit was de
+  oorzaak, toetsenbord verschijnt nu ook in landscape.**
