@@ -140,3 +140,29 @@ Log van keuzes bij onduidelijkheden, één regel context per beslissing.
   16px, een bekende iOS Safari-eigenaardigheid rond focus-gedrag bij velden
   onder 16px. **Bevestigd door test op het apparaat (2026-07-12): dit was de
   oorzaak, toetsenbord verschijnt nu ook in landscape.**
+
+## Klus 4: bibliotheek-import (2026-07-12)
+
+- "Exact dezelfde naam" geïnterpreteerd als getrimd en niet hoofdlettergevoelig
+  vergeleken (`naam.trim().toLowerCase()`), niet een letterlijke
+  string-vergelijking. Reden: een importbestand met "Grenzenoefening: Stop!"
+  naast een bestaande "grenzenoefening: stop! " zou anders alsnog dubbel
+  worden toegevoegd, wat niet is wat een gebruiker van "exact dezelfde naam"
+  verwacht. Geen andere normalisatie (leestekens, spaties tussen woorden
+  blijven meetellen).
+- Geen nieuwe validatie- of normalisatielogica voor de geïmporteerde
+  oefeningen zelf: `migreerExercises` (al aanwezig, gebruikt ook bij het
+  laden van een backup) kent id's toe en vult ontbrekende/optionele velden
+  aan met de defaults uit `leegExercise`/`leegScenario`. Zo blijft er één
+  route die het v2-datamodel afdwingt, in plaats van een tweede kopie van
+  die regels in de importfunctie.
+- Bij een ongeldig bestand (geen JSON, of `formaat` is niet `tdb-import-v1`,
+  of `exercises` ontbreekt/is geen lijst) een duidelijke `window.alert` en
+  verder niets gewijzigd, zelfde patroon als bij "Backup terugzetten".
+- Import voegt alleen toe aan `data.exercises`, nooit een vervangende of
+  mergende bewerking; overgeslagen oefeningen (naam bestond al) worden met
+  naam genoemd in de meldingstekst na afloop.
+- `test-import.json` toegevoegd in de projectroot als testbestand met drie
+  verzonnen oefeningen (één met een scenario) voor handmatig testen van de
+  knop. Geen onderdeel van de build, mag na gebruik blijven staan of
+  verwijderd worden.

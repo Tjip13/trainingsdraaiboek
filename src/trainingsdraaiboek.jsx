@@ -813,6 +813,7 @@ function BibliotheekTab({ data, up }) {
   const [weergave, setWeergave] = useState("oefeningen");
   const [openScenId, setOpenScenId] = useState(null);
   const [typeFilter, setTypeFilter] = useState("alle");
+  const importRef = useRef(null);
 
   const alleTags = useMemo(() => {
     const s = new Set();
@@ -846,6 +847,34 @@ function BibliotheekTab({ data, up }) {
     setEditing(null);
   };
 
+  const importeer = (file) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      let json;
+      try { json = JSON.parse(e.target.result); }
+      catch { window.alert("Dit bestand is geen geldige JSON."); return; }
+      if (!json || json.formaat !== "tdb-import-v1" || !Array.isArray(json.exercises)) {
+        window.alert('Dit bestand is geen importbestand in het formaat "tdb-import-v1".');
+        return;
+      }
+      const bestaandeNamen = new Set(data.exercises.map((ex) => ex.naam.trim().toLowerCase()));
+      const nieuw = migreerExercises(json.exercises);
+      const toeTeVoegen = [];
+      const overgeslagen = [];
+      nieuw.forEach((ex) => {
+        const sleutel = ex.naam.trim().toLowerCase();
+        if (sleutel && bestaandeNamen.has(sleutel)) { overgeslagen.push(ex.naam); return; }
+        if (sleutel) bestaandeNamen.add(sleutel);
+        toeTeVoegen.push(ex);
+      });
+      if (toeTeVoegen.length) up({ exercises: [...data.exercises, ...toeTeVoegen] });
+      let melding = `${toeTeVoegen.length} oefening(en) geïmporteerd.`;
+      if (overgeslagen.length) melding += `\n\nOvergeslagen (naam bestond al):\n${overgeslagen.join("\n")}`;
+      window.alert(melding);
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className="tabinhoud">
       <div className="tabkop">
@@ -854,6 +883,9 @@ function BibliotheekTab({ data, up }) {
           <button className={weergave === "oefeningen" ? "actief" : ""} onClick={() => setWeergave("oefeningen")}>Oefeningen</button>
           <button className={weergave === "simulaties" ? "actief" : ""} onClick={() => setWeergave("simulaties")}>Simulaties</button>
         </div>
+        <button className="knop" onClick={() => importRef.current?.click()}><Upload size={14} /> Importeren</button>
+        <input ref={importRef} type="file" accept=".json,application/json" style={{ display: "none" }}
+          onChange={(e) => { if (e.target.files[0]) importeer(e.target.files[0]); e.target.value = ""; }} />
         <button className="knop primair" onClick={() => { setOpenScenId(null); setEditing(leegExercise()); }}>
           <Plus size={16} /> Nieuwe oefening
         </button>
